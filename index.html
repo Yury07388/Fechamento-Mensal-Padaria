@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Fechamento de Caixa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#1a1a18; --surface:#222220; --surface2:#2a2a27; --line:#34342f; --line2:#3e3e38;
+  --text:#ecebe6; --muted:#9a988f; --faint:#6d6b64;
+  --accent:#d6409f; --accent-soft:rgba(214,64,159,.14);
+  --pos:#3ccf8e; --neg:#ff6b6b;
+  --cash:#e9b949; --card:#5aa9f0; --pix:#3ccf8e;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:14px}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 60px}
+header.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.logo{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;font-weight:700;color:#fff}
+.brand h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
+.brand small{display:block;color:var(--muted);font-size:12px;font-weight:500}
+.yearsel{display:flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.yearsel button{background:none;border:0;padding:8px 12px;color:var(--muted)}
+.yearsel button:hover{color:var(--text)}
+.yearsel span{font-weight:600;min-width:46px;text-align:center}
+.btn{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-weight:500}
+.btn:hover{border-color:var(--line2);background:var(--surface2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+.status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--pos);display:inline-block}
+.status.dirty i{background:var(--cash)}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:20px;scrollbar-width:thin}
+.tabs button{background:none;border:0;padding:10px 14px;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;position:relative}
+.tabs button:hover{color:var(--text)}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.tabs button .dot{position:absolute;top:8px;right:6px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.tabs .sep{flex:1}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.card .lbl{color:var(--muted);font-size:12px;font-weight:500;margin-bottom:6px}
+.card .val{font-size:21px;font-weight:700;letter-spacing:-.01em}
+.card .sub{color:var(--faint);font-size:12px;margin-top:4px}
+.card.hero{background:linear-gradient(135deg,rgba(214,64,159,.22),rgba(214,64,159,.04));border-color:rgba(214,64,159,.4)}
+.pos{color:var(--pos)} .neg{color:var(--neg)}
+.mix{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:20px}
+.mix .bar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--surface2);margin:10px 0}
+.mix .bar div{height:100%}
+.mix .legend{display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.mix .legend b{color:var(--text);font-weight:600;margin-left:4px}
+.sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.tablebox{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:900px}
+thead th{position:sticky;top:0;background:var(--surface2);z-index:1;font-size:12px;font-weight:600;color:var(--muted);text-align:right;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+thead tr.grp th{text-align:center;color:var(--text);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:8px 12px 4px;border-bottom:0}
+thead tr.grp th.ent{color:var(--accent)}
+th.l,td.l{text-align:left}
+tbody td{border-bottom:1px solid var(--line);padding:0;text-align:right;height:38px}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+tbody tr.wk td.dt{color:var(--faint)}
+tbody tr.today td.dt{box-shadow:inset 3px 0 0 var(--accent)}
+td.dt{padding:0 12px;white-space:nowrap;text-align:left}
+td.dt .wd{color:var(--faint);font-size:11px;margin-left:6px;text-transform:uppercase;letter-spacing:.04em}
+td.calc{padding:0 12px;font-weight:600;white-space:nowrap}
+td.acc{padding:0 12px;color:var(--muted);white-space:nowrap}
+td input{width:100%;height:38px;background:transparent;border:0;color:var(--text);text-align:right;padding:0 12px;font:inherit;font-variant-numeric:tabular-nums;outline:none}
+td input::placeholder{color:#3d3d38}
+td input:focus{background:var(--accent-soft);box-shadow:inset 0 0 0 1.5px var(--accent)}
+td input.out{color:var(--neg)}
+td input.negv{color:var(--neg)}
+td input.err{box-shadow:inset 0 0 0 1.5px var(--neg)}
+td.obs input{text-align:left;color:var(--muted);min-width:160px}
+tfoot td{padding:12px;font-weight:700;text-align:right;background:var(--surface2);white-space:nowrap;border-top:1px solid var(--line2)}
+tfoot td.l{text-align:left}
+.hint{color:var(--faint);font-size:12px;margin-top:12px;line-height:1.6}
+.hint kbd{background:var(--surface2);border:1px solid var(--line);border-radius:4px;padding:0 5px;font-family:inherit;font-size:11px;color:var(--muted)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface2);border:1px solid var(--line2);padding:10px 16px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;font-size:13px;z-index:10}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.yr td{padding:0 12px}
+.yr tbody tr{cursor:pointer}
+.yr td.mname{font-weight:600}
+.empty{color:var(--faint)}
+#gate{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(900px 500px at 50% -10%,rgba(214,64,159,.18),transparent 70%),var(--bg)}
+#gate[hidden],#main[hidden]{display:none}
+.gbox{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:32px 28px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.gbox .logo{width:46px;height:46px;border-radius:12px;font-size:20px;margin:0 auto 16px}
+.gbox h2{text-align:center;margin:0 0 4px;font-size:20px;font-weight:700}
+.gbox p.lead{text-align:center;color:var(--muted);margin:0 0 24px;font-size:13px;line-height:1.5}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;height:42px;background:var(--bg);border:1px solid var(--line2);border-radius:10px;color:var(--text);padding:0 12px;font:inherit;outline:none}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.gbox .btn.primary{width:100%;height:44px;margin-top:6px}
+.gerr{color:var(--neg);font-size:13px;min-height:18px;margin:4px 0 0;text-align:center}
+.gnote{color:var(--faint);font-size:12px;line-height:1.5;margin-top:18px;text-align:center}
+.gcancel{display:block;margin:12px auto 0;background:none;border:0;color:var(--muted);font-size:13px}
+.gcancel:hover{color:var(--text)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--text);background:var(--surface)}
+@media (max-width:640px){.wrap{padding:16px 12px 50px}.card .val{font-size:18px}}
+
+.menu{position:relative}
+.menu-pop{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface2);border:1px solid var(--line2);border-radius:12px;padding:6px;min-width:220px;z-index:5;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+.menu-pop[hidden]{display:none}
+.menu-pop button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-radius:8px;color:var(--text)}
+.menu-pop button:hover{background:var(--surface)}
+.menu-pop hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
+.fhelp{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5}
+.fhelp a{color:var(--accent)}
+#gfields[hidden],#gconfWrap[hidden],#gtokWrap[hidden]{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="gate">
+    <form class="gbox" id="gform" autocomplete="on">
+      <div class="logo">$</div>
+      <h2 id="gtitle">Fechamento de Caixa</h2>
+      <p class="lead" id="glead">Carregando…</p>
+      <div id="gfields" hidden>
+        <div class="field"><label for="guser">Usuário</label><input id="guser" name="username" autocomplete="username"></div>
+        <div class="field"><label for="gpass">Senha</label><input id="gpass" name="password" type="password" autocomplete="current-password"></div>
+        <div class="field" id="gconfWrap" hidden><label for="gconf">Confirmar senha</label><input id="gconf" type="password" autocomplete="new-password"></div>
+        <div class="field" id="gtokWrap" hidden>
+          <label for="gtok">Token do GitHub</label>
+          <input id="gtok" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+          <div class="fhelp" id="gtokHelp">Crie em <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens</a> com acesso só a este repositório e permissão <b>Contents: Read and write</b>.</div>
+        </div>
+        <button class="btn primary" id="gbtn" type="submit">Entrar</button>
+      </div>
+      <p class="gerr" id="gerr"></p>
+      <button class="gcancel" id="gcancel" type="button" hidden>Cancelar</button>
+      <p class="gnote" id="gnote"></p>
+    </form>
+  </section>
+  <div id="main" hidden>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div class="logo">$</div>
+        <div><h1>Fechamento de Caixa</h1><small id="subtitle">Controle diário de entradas e saídas</small></div>
+      </div>
+      <div class="status" id="status"><i></i><span>Tudo salvo</span></div>
+      <div class="yearsel"><button id="yprev" aria-label="Ano anterior">‹</button><span id="ylabel" class="num"></span><button id="ynext" aria-label="Próximo ano">›</button></div>
+      <button class="btn primary" id="saveBtn" disabled>Salvar</button>
+      <div class="menu">
+        <button class="btn" id="menuBtn" aria-haspopup="true">Opções ▾</button>
+        <div class="menu-pop" id="menuPop" hidden>
+          <button data-act="csv">Exportar CSV</button>
+          <button data-act="backup">Baixar backup (.json)</button>
+          <button data-act="import">Importar backup…</button>
+          <hr>
+          <button data-act="pw">Trocar senha / token</button>
+        </div>
+      </div>
+      <button class="btn ghost" id="logoutBtn">Sair</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </header>
+    <nav class="tabs" id="tabs"></nav>
+    <section id="view"></section>
+  </div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+// ================= CONFIGURAÇÃO =================
+// Em <usuario>.github.io/<repo> o repositório é detectado sozinho.
+// Preencha owner/repo só se usar domínio próprio.
+const CFG = {
+  owner: 'Yury07388',
+  repo: 'Fechamento-Mensal-Padaria',
+  dataBranch: 'dados',      // branch onde fica o arquivo criptografado
+  dataPath: 'data.json'
+};
+// ================================================
+(function detect(){
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if(!m) return;
+  if(!CFG.owner) CFG.owner = m[1];
+  if(!CFG.repo){ const seg = location.pathname.split('/').filter(Boolean)[0]; CFG.repo = (seg && !seg.includes('.')) ? seg : m[1] + '.github.io'; }
+})();
+
+const API = 'https://api.github.com';
+const SESSION_KEY = 'fechamento-caixa-sessao';
+const draftKey = ()=>'fechamento-caixa-draft:' + CFG.owner + '/' + CFG.repo;
+const ITER = 310000;
+const IDLE_MIN = 20;
+const AUTOSAVE_MS = 4000;
+
+let stored = null, remoteSha = null;   // conteúdo criptografado do repositório
+let state = null;                      // dados abertos (só na memória após login)
+let cryptoKey = null, salt = null, ghToken = null;
+let dirty = false;
+
+// ---------- criptografia (AES-GCM 256 + PBKDF2) ----------
+const TE = new TextEncoder(), TD = new TextDecoder();
+function b64(buf){ const u = new Uint8Array(buf); let s=''; for(let i=0;i<u.length;i+=0x8000) s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); return btoa(s); }
+function unb64(s){ const b = atob(s), u = new Uint8Array(b.length); for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return u; }
+async function deriveKey(user, pass, saltB64, iter){
+  const base = await crypto.subtle.importKey('raw', TE.encode(user.trim().toLowerCase()+'\u0000'+pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt:unb64(saltB64), iterations:iter, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, true, ['encrypt','decrypt']);
+}
+async function encrypt(obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, cryptoKey, TE.encode(JSON.stringify(obj)));
+  return {iv:b64(iv), ct:b64(ct)};
+}
+async function decrypt(key, e){
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(e.iv)}, key, unb64(e.ct));
+  return JSON.parse(TD.decode(pt));
+}
+async function rememberSession(){
+  try{ const raw = await crypto.subtle.exportKey('raw', cryptoKey); sessionStorage.setItem(SESSION_KEY, JSON.stringify({salt, k:b64(raw)})); }catch(e){}
+}
+async function sessionKey(){
+  try{
+    const s = JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
+    if(!s || s.salt!==salt) return null;
+    return await crypto.subtle.importKey('raw', unb64(s.k), {name:'AES-GCM'}, true, ['encrypt','decrypt']);
+  }catch(e){ return null; }
+}
+
+const readOnly = false;
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MES3 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DIAS = ['dom','seg','ter','qua','qui','sex','sáb'];
+const COLS = [['din','Dinheiro'],['car','Cartão (créd./déb.)'],['pix','Pix'],['sai','Saídas']];
+
+const now = new Date();
+let year = now.getFullYear(), month = now.getMonth(); // month -1 = resumo anual
+
+const $ = id => document.getElementById(id);
+const brl = n => (n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const plain = n => n==null ? '' : n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const key = (y,m) => y+'-'+String(m+1).padStart(2,'0');
+const cls = n => n>0.004?'pos':(n<-0.004?'neg':'');
+
+function parseNum(str){
+  str = String(str||'').replace(/R\$|\s/g,'');
+  if(!str) return null;
+  const terms = str.match(/[+-]?[^+-]+/g); if(!terms) return NaN;
+  let total = 0;
+  for(let t of terms){
+    let sign = 1;
+    if(t[0]==='-'){sign=-1;t=t.slice(1)} else if(t[0]==='+'){t=t.slice(1)}
+    if(t.includes(',')) t = t.replace(/\./g,'').replace(',','.');
+    else if(/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,'');
+    const v = Number(t); if(!isFinite(v) || t==='') return NaN;
+    total += sign*v;
+  }
+  return Math.round(total*100)/100;
+}
+
+function monthData(y,m){ return state.months[key(y,m)] || {}; }
+function dayTotal(r){ return r ? (r.din||0)+(r.car||0)+(r.pix||0)-(r.sai||0) : 0; }
+function hasMov(r){ return r && ['din','car','pix','sai'].some(k=>r[k]); }
+function summarize(y,m){
+  const data = monthData(y,m), s = {din:0,car:0,pix:0,sai:0,dias:0,best:null,worst:null};
+  for(const d in data){
+    const r = data[d]; if(!hasMov(r)) continue;
+    s.din+=r.din||0; s.car+=r.car||0; s.pix+=r.pix||0; s.sai+=r.sai||0; s.dias++;
+    const t = dayTotal(r);
+    if(!s.best || t>s.best.t) s.best={d:+d,t};
+    if(!s.worst || t<s.worst.t) s.worst={d:+d,t};
+  }
+  s.ent = s.din+s.car+s.pix; s.res = s.ent - s.sai;
+  return s;
+}
+
+// ---------- abas ----------
+function renderTabs(){
+  $('ylabel').textContent = year;
+  let h = '';
+  for(let m=0;m<12;m++){
+    const has = Object.values(monthData(year,m)).some(hasMov);
+    h += `<button data-m="${m}" class="${m===month?'on':''}">${MES3[m]}. ${year}${has?'<span class="dot"></span>':''}</button>`;
+  }
+  h += `<span class="sep"></span><button data-m="-1" class="${month===-1?'on':''}">Resumo ${year}</button>`;
+  $('tabs').innerHTML = h;
+  const on = $('tabs').querySelector('.on'); if(on && on.scrollIntoView) on.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+$('tabs').addEventListener('click',e=>{
+  const b = e.target.closest('button[data-m]'); if(!b) return;
+  month = +b.dataset.m; go();
+});
+$('yprev').onclick = ()=>{year--; go();};
+$('ynext').onclick = ()=>{year++; go();};
+
+function go(){
+  const h = month===-1 ? 'ano-'+year : key(year,month);
+  if(location.hash.slice(1)!==h){ try{ history.replaceState(null,'','#'+h);}catch(e){ location.hash=h; } }
+  render();
+}
+function readHash(){
+  const h = location.hash.slice(1);
+  let m;
+  if((m = h.match(/^(\d{4})-(\d{2})$/))){ year=+m[1]; month=Math.min(11,Math.max(0,+m[2]-1)); }
+  else if((m = h.match(/^ano-(\d{4})$/))){ year=+m[1]; month=-1; }
+}
+window.addEventListener('hashchange',()=>{readHash();render();});
+
+// ---------- visão do mês ----------
+function cardsHTML(s){
+  const media = s.dias ? s.res/s.dias : 0;
+  const pct = v => s.ent>0 ? Math.max(0,v)/s.ent*100 : 0;
+  return `
+  <div class="cards">
+    <div class="card hero"><div class="lbl">Resultado do mês</div><div class="val num ${cls(s.res)}">${brl(s.res)}</div><div class="sub">${s.dias} dia${s.dias===1?'':'s'} com movimento</div></div>
+    <div class="card"><div class="lbl">Total de entradas</div><div class="val num">${brl(s.ent)}</div><div class="sub">Dinheiro + cartão + Pix</div></div>
+    <div class="card"><div class="lbl">Total de saídas</div><div class="val num neg">${brl(-s.sai)}</div><div class="sub">${s.ent>0?Math.round(s.sai/s.ent*100)+'% das entradas':'—'}</div></div>
+    <div class="card"><div class="lbl">Média por dia</div><div class="val num ${cls(media)}">${brl(media)}</div><div class="sub">Considera só dias com movimento</div></div>
+    <div class="card"><div class="lbl">Melhor / pior dia</div>
+      <div class="val num" style="font-size:15px;line-height:1.5">${s.best?`<span class="pos">${String(s.best.d).padStart(2,'0')} · ${brl(s.best.t)}</span><br><span class="neg">${String(s.worst.d).padStart(2,'0')} · ${brl(s.worst.t)}</span>`:'<span class="empty">—</span>'}</div></div>
+  </div>
+  <div class="mix">
+    <div class="lbl" style="color:var(--muted);font-size:12px;font-weight:500">Composição das entradas</div>
+    <div class="bar"><div style="width:${pct(s.din)}%;background:var(--cash)"></div><div style="width:${pct(s.car)}%;background:var(--card)"></div><div style="width:${pct(s.pix)}%;background:var(--pix)"></div></div>
+    <div class="legend num">
+      <span><i class="sw" style="background:var(--cash)"></i>Dinheiro<b>${brl(s.din)}</b> ${s.ent>0?'('+Math.round(pct(s.din))+'%)':''}</span>
+      <span><i class="sw" style="background:var(--card)"></i>Cartão<b>${brl(s.car)}</b> ${s.ent>0?'('+Math.round(pct(s.car))+'%)':''}</span>
+      <span><i class="sw" style="background:var(--pix)"></i>Pix<b>${brl(s.pix)}</b> ${s.ent>0?'('+Math.round(pct(s.pix))+'%)':''}</span>
+    </div>
+  </div>`;
+}
+
+function renderMonth(){
+  const data = monthData(year,month);
+  const nd = new Date(year,month+1,0).getDate();
+  const s = summarize(year,month);
+  let rows = '', acc = 0;
+  for(let d=1; d<=nd; d++){
+    const r = data[d]||{}, dt = new Date(year,month,d), wd = dt.getDay();
+    const t = dayTotal(r); acc += t;
+    const isToday = dt.toDateString()===now.toDateString();
+    rows += `<tr data-d="${d}" class="${wd===0||wd===6?'wk':''} ${isToday?'today':''}">
+      <td class="dt num">${String(d).padStart(2,'0')}/${String(month+1).padStart(2,'0')}/${year}<span class="wd">${DIAS[wd]}</span></td>
+      ${COLS.map(([k])=>`<td><input inputmode="decimal" autocomplete="off" data-k="${k}" value="${plain(r[k])}" class="${k==='sai'?'out':''} ${k!=='sai'&&r[k]<0?'negv':''}" placeholder="—" ${readOnly?'readonly':''}></td>`).join('')}
+      <td class="calc num ${cls(t)}" data-c="t">${hasMov(r)?brl(t):'<span class="empty">R$ 0,00</span>'}</td>
+      <td class="acc num" data-c="a">${hasMov(r)||acc?brl(acc):''}</td>
+      <td class="obs l"><input data-k="obs" value="${(r.obs||'').replace(/"/g,'&quot;')}" placeholder="Observação" ${readOnly?'readonly':''}></td>
+    </tr>`;
+  }
+  $('view').innerHTML = `
+    <div id="cardsBox">${cardsHTML(s)}</div>
+    <div class="tablebox"><table>
+      <thead>
+        <tr class="grp"><th class="l"></th><th colspan="3" class="ent">Entradas</th><th></th><th colspan="2"></th><th></th></tr>
+        <tr><th class="l">Data</th><th>Dinheiro em espécie</th><th>Cartão (créd. e déb.)</th><th>Pix</th><th>Saídas</th><th>Total do dia</th><th>Saldo acumulado</th><th class="l">Observação</th></tr>
+      </thead>
+      <tbody id="tbody">${rows}</tbody>
+      <tfoot><tr id="tfoot"></tr></tfoot>
+    </table></div>
+    <div class="hint">Digite os valores direto nas células — aceita <kbd>1.190,62</kbd>, <kbd>1190.62</kbd> ou somas como <kbd>150+80,50</kbd>. Saídas podem ser digitadas sem sinal. <kbd>Enter</kbd> desce para o dia seguinte.</div>`;
+  renderFoot(s);
+}
+function renderFoot(s){
+  $('tfoot').innerHTML = `<td class="l">Total ${MESES[month]}</td><td class="num">${brl(s.din)}</td><td class="num">${brl(s.car)}</td><td class="num">${brl(s.pix)}</td><td class="num neg">${brl(-s.sai)}</td><td class="num ${cls(s.res)}">${brl(s.res)}</td><td></td><td></td>`;
+}
+function refreshComputed(){
+  const data = monthData(year,month); let acc = 0;
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
+    const r = data[tr.dataset.d], t = dayTotal(r); acc += t;
+    const tc = tr.querySelector('[data-c=t]');
+    tc.className = 'calc num '+cls(t);
+    tc.innerHTML = hasMov(r)?brl(t):'<span class="empty">R$ 0,00</span>';
+    tr.querySelector('[data-c=a]').textContent = hasMov(r)||acc?brl(acc):'';
+  });
+  const s = summarize(year,month);
+  $('cardsBox').innerHTML = cardsHTML(s);
+  renderFoot(s);
+}
+
+// ---------- edição ----------
+document.addEventListener('input',e=>{
+  const inp = e.target; if(!inp.matches('#tbody input')) return;
+  const d = inp.closest('tr').dataset.d, k = inp.dataset.k, K = key(year,month);
+  const m = state.months[K] || (state.months[K] = {});
+  const r = m[d] || (m[d] = {});
+  if(k==='obs'){ if(inp.value.trim()) r.obs = inp.value; else delete r.obs; }
+  else{
+    let v = parseNum(inp.value);
+    inp.classList.toggle('err', Number.isNaN(v));
+    if(Number.isNaN(v)) return;
+    if(k==='sai' && v!=null) v = Math.abs(v);
+    if(v==null || v===0) delete r[k]; else r[k] = v;
+    inp.classList.toggle('negv', k!=='sai' && v<0);
+  }
+  if(!Object.keys(r).length) delete m[d];
+  if(!Object.keys(m).length) delete state.months[K];
+  markDirty(); refreshComputed();
+});
+document.addEventListener('focusout',e=>{
+  const inp = e.target; if(!inp.matches('#tbody input') || inp.dataset.k==='obs') return;
+  const v = parseNum(inp.value);
+  if(!Number.isNaN(v)){ inp.value = plain(v==null||v===0?null:(inp.dataset.k==='sai'?Math.abs(v):v)); inp.classList.remove('err'); }
+});
+document.addEventListener('focusin',e=>{ if(e.target.matches('#tbody input')) e.target.select(); });
+document.addEventListener('keydown',e=>{
+  const inp = e.target; if(!inp.matches || !inp.matches('#tbody input')) return;
+  let tr = null;
+  if(e.key==='Enter' || e.key==='ArrowDown') tr = inp.closest('tr').nextElementSibling;
+  else if(e.key==='ArrowUp') tr = inp.closest('tr').previousElementSibling;
+  else if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); save(); return; }
+  if(tr){ e.preventDefault(); tr.querySelector(`input[data-k="${inp.dataset.k}"]`).focus(); }
+  else if(e.key==='Enter') e.preventDefault();
+});
+
+// ---------- resumo anual ----------
+function renderYear(){
+  let rows = '', T = {din:0,car:0,pix:0,ent:0,sai:0,res:0,dias:0};
+  for(let m=0;m<12;m++){
+    const s = summarize(year,m);
+    for(const k in T) T[k]+=s[k];
+    rows += `<tr data-m="${m}"><td class="l mname">${MESES[m]}</td>${s.dias?`
+      <td class="num">${brl(s.din)}</td><td class="num">${brl(s.car)}</td><td class="num">${brl(s.pix)}</td>
+      <td class="num">${brl(s.ent)}</td><td class="num neg">${brl(-s.sai)}</td><td class="num ${cls(s.res)}" style="font-weight:600">${brl(s.res)}</td><td class="num">${s.dias}</td>`
+      :'<td colspan="7" class="empty" style="text-align:center">sem lançamentos</td>'}</tr>`;
+  }
+  const media = T.dias? T.res/T.dias : 0;
+  $('view').innerHTML = `
+    <div class="cards">
+      <div class="card hero"><div class="lbl">Resultado ${year}</div><div class="val num ${cls(T.res)}">${brl(T.res)}</div><div class="sub">${T.dias} dias com movimento</div></div>
+      <div class="card"><div class="lbl">Entradas no ano</div><div class="val num">${brl(T.ent)}</div></div>
+      <div class="card"><div class="lbl">Saídas no ano</div><div class="val num neg">${brl(-T.sai)}</div></div>
+      <div class="card"><div class="lbl">Média por dia</div><div class="val num ${cls(media)}">${brl(media)}</div></div>
+    </div>
+    <div class="tablebox"><table class="yr">
+      <thead><tr><th class="l">Mês</th><th>Dinheiro</th><th>Cartão</th><th>Pix</th><th>Entradas</th><th>Saídas</th><th>Resultado</th><th>Dias</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td class="l">Total ${year}</td><td class="num">${brl(T.din)}</td><td class="num">${brl(T.car)}</td><td class="num">${brl(T.pix)}</td><td class="num">${brl(T.ent)}</td><td class="num neg">${brl(-T.sai)}</td><td class="num ${cls(T.res)}">${brl(T.res)}</td><td class="num">${T.dias}</td></tr></tfoot>
+    </table></div>
+    <div class="hint">Clique em um mês para abrir o fechamento dele.</div>`;
+  $('view').querySelector('tbody').addEventListener('click',e=>{
+    const tr = e.target.closest('tr[data-m]'); if(tr){ month = +tr.dataset.m; go(); }
+  });
+}
+
+function render(){
+  if(!state) return;
+  renderTabs();
+  $('subtitle').textContent = month===-1 ? `Resumo anual · ${year}` : `${MESES[month]} de ${year}`;
+  month===-1 ? renderYear() : renderMonth();
+}
+
+function csv(){
+  const n = v => v==null?'':v.toFixed(2).replace('.',',');
+  const lines = [];
+  const months = month===-1 ? [...Array(12).keys()] : [month];
+  lines.push(['Data','Dinheiro','Cartão','Pix','Saídas','Total do dia','Observação'].join(';'));
+  for(const m of months){
+    const data = monthData(year,m), nd = new Date(year,m+1,0).getDate();
+    for(let d=1; d<=nd; d++){
+      const r = data[d]; if(month===-1 && !hasMov(r)) continue; const x = r||{};
+      lines.push([`${String(d).padStart(2,'0')}/${String(m+1).padStart(2,'0')}/${year}`, n(x.din), n(x.car), n(x.pix), x.sai?n(-x.sai):'', n(dayTotal(x)), '"'+(x.obs||'').replace(/"/g,'""')+'"'].join(';'));
+    }
+  }
+  return '﻿'+lines.join('\r\n');
+}
+// ---------- salvar (GitHub) ----------
+function setStatus(text, isDirty){
+  const s = $('status'); s.classList.toggle('dirty', !!isDirty);
+  s.querySelector('span').textContent = text;
+}
+let draftTimer, autoTimer, saving = false, editSeq = 0, lastError = null;
+function markDirty(){
+  dirty = true; editSeq++; state.updatedAt = Date.now();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(writeDraft, 400);
+  setStatus('Alterações não salvas', true); $('saveBtn').disabled = false;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(()=>save(), AUTOSAVE_MS);
+}
+async function writeDraft(){
+  try{ const e = await encrypt(payload()); localStorage.setItem(draftKey(), JSON.stringify({salt, updatedAt:state.updatedAt, ...e})); }catch(e){}
+}
+function payload(){ return {months:state.months, updatedAt:state.updatedAt||0, token:ghToken}; }
+
+async function save(force){
+  if(!cryptoKey || !state || (!dirty && !force)) return false;
+  if(saving){ clearTimeout(autoTimer); autoTimer = setTimeout(()=>save(force), 1500); return false; }
+  saving = true; clearTimeout(autoTimer);
+  const seq = editSeq;
+  $('saveBtn').disabled = true; setStatus('Salvando…', true);
+  try{
+    const e = await encrypt(payload());
+    const out = {v:2, savedAt:Date.now(), enc:{salt, iter:ITER, iv:e.iv, ct:e.ct}};
+    const body = {
+      message: 'Fechamento atualizado em ' + new Date().toLocaleString('pt-BR'),
+      content: btoa(JSON.stringify(out)),
+      branch: CFG.dataBranch
+    };
+    if(!remoteSha && stored){ try{ remoteSha = (await loadRemote(ghToken)).sha; }catch(_){} }
+    if(remoteSha) body.sha = remoteSha;
+    const r = await gh(`${repoPath()}/contents/${CFG.dataPath}`, {method:'PUT', body:JSON.stringify(body)}, ghToken);
+    remoteSha = r.content.sha; stored = out; lastError = null;
+    if(seq === editSeq){
+      dirty = false; setStatus('Tudo salvo', false);
+      try{ localStorage.removeItem(draftKey()); }catch(_){}
+    } else { setStatus('Alterações não salvas', true); $('saveBtn').disabled = false; autoTimer = setTimeout(()=>save(), AUTOSAVE_MS); }
+    await rememberSession();
+    return true;
+  }catch(err){
+    lastError = err;
+    $('saveBtn').disabled = false;
+    if(err.status === 401){ setStatus('Token inválido ou expirado', true); toast('Token do GitHub inválido ou expirado — atualize em Opções › Trocar senha / token'); }
+    else if(err.status === 403 || err.status === 404){ setStatus('Sem permissão no repositório', true); toast('O token não tem permissão de escrita neste repositório'); }
+    else if(err.status === 409 || err.status === 422){ setStatus('Conflito — recarregue a página', true); toast('Os dados foram alterados em outro aparelho. Recarregue a página (suas alterações daqui ficam no rascunho).'); }
+    else { setStatus('Sem conexão — tentando de novo', true); autoTimer = setTimeout(()=>save(), 15000); }
+    return false;
+  }finally{ saving = false; }
+}
+$('saveBtn').onclick = ()=>save();
+window.addEventListener('beforeunload', e=>{ if(dirty){ writeDraft(); e.preventDefault(); e.returnValue=''; } });
+
+// ---------- exportar / backup ----------
+function download(name, text, type){
+  const url = URL.createObjectURL(new Blob([text], {type}));
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+function exportCsv(){
+  const name = month===-1 ? `fechamento-${year}.csv` : `fechamento-${MES3[month].toLowerCase()}-${year}.csv`;
+  download(name, csv(), 'text/csv;charset=utf-8');
+}
+function exportBackup(){
+  const d = new Date(), stamp = d.toISOString().slice(0,10);
+  download(`fechamento-backup-${stamp}.json`, JSON.stringify({tipo:'fechamento-caixa-backup', v:1, exportadoEm:d.toISOString(), months:state.months}, null, 1), 'application/json');
+  toast('Backup baixado — atenção: o arquivo não é criptografado');
+}
+$('importFile').addEventListener('change', async e=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    const months = j.months || (j.v===1 && j.months);
+    if(!months || typeof months!=='object') throw new Error('formato');
+    let n = 0;
+    for(const k in months){ if(/^\d{4}-\d{2}$/.test(k)){ state.months[k] = months[k]; n++; } }
+    if(!n) throw new Error('vazio');
+    markDirty(); render();
+    toast(`${n} ${n===1?'mês importado':'meses importados'}`);
+  }catch(err){ toast('Arquivo de backup inválido'); }
+});
+
+// menu
+$('menuBtn').onclick = e=>{ e.stopPropagation(); $('menuPop').hidden = !$('menuPop').hidden; };
+document.addEventListener('click', e=>{ if(!e.target.closest('.menu')) $('menuPop').hidden = true; });
+$('menuPop').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  $('menuPop').hidden = true;
+  const a = b.dataset.act;
+  if(a==='csv') exportCsv();
+  else if(a==='backup') exportBackup();
+  else if(a==='import') $('importFile').click();
+  else if(a==='pw') showGate('change');
+});
+
+let tt; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),3200); }
+
+// ---------- GitHub ----------
+async function gh(path, opts={}, token){
+  const headers = {'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28'};
+  if(token) headers.Authorization = 'Bearer ' + token;
+  if(opts.body) headers['Content-Type'] = 'application/json';
+  const r = await fetch(API + path, {...opts, headers, cache:'no-store'});
+  if(!r.ok){ const e = new Error('GitHub ' + r.status); e.status = r.status; try{ e.body = await r.json(); }catch(_){} throw e; }
+  return r.status===204 ? null : r.json();
+}
+const repoPath = ()=>`/repos/${CFG.owner}/${CFG.repo}`;
+async function loadRemote(token){
+  try{
+    const j = await gh(`${repoPath()}/contents/${CFG.dataPath}?ref=${encodeURIComponent(CFG.dataBranch)}`, {}, token);
+    return {sha:j.sha, data:JSON.parse(atob(j.content.replace(/\s/g,'')))};
+  }catch(e){
+    if(e.status === 404) return {sha:null, data:null};
+    if(e.status === 403 && !token){ // limite da API sem login: tenta o arquivo bruto
+      const r = await fetch(`https://raw.githubusercontent.com/${CFG.owner}/${CFG.repo}/${CFG.dataBranch}/${CFG.dataPath}?t=${Date.now()}`, {cache:'no-store'});
+      if(r.status === 404) return {sha:null, data:null};
+      if(r.ok) return {sha:null, data:await r.json()};
+    }
+    throw e;
+  }
+}
+async function checkToken(token){
+  let repo;
+  try{ repo = await gh(repoPath(), {}, token); }
+  catch(e){ throw new Error(e.status===401 ? 'Token inválido.' : 'O token não tem acesso ao repositório '+CFG.owner+'/'+CFG.repo+'.'); }
+  if(!repo.permissions || !repo.permissions.push) throw new Error('O token precisa da permissão Contents: Read and write.');
+  // garante a branch de dados (separada, para não republicar o site a cada salvamento)
+  try{ await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(CFG.dataBranch)}`, {}, token); }
+  catch(e){
+    if(e.status !== 404) throw new Error('Não foi possível verificar a branch de dados.');
+    const base = await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`, {}, token);
+    await gh(`${repoPath()}/git/refs`, {method:'POST', body:JSON.stringify({ref:'refs/heads/'+CFG.dataBranch, sha:base.object.sha})}, token);
+  }
+}
+
+// ---------- login ----------
+let gateMode = 'loading';
+function showGate(mode, msg){
+  gateMode = mode;
+  const setup = mode==='setup' || mode==='change';
+  $('gtitle').textContent = mode==='setup' ? 'Criar acesso' : mode==='change' ? 'Trocar senha / token' : 'Fechamento de Caixa';
+  $('glead').textContent = mode==='setup' ? 'Defina usuário e senha e conecte ao seu repositório do GitHub.'
+    : mode==='change' ? 'Escolha o novo usuário e senha. Deixe o token em branco para manter o atual.'
+    : mode==='error' ? 'Não foi possível carregar os dados.' : 'Entre com seu usuário e senha.';
+  $('gfields').hidden = mode==='error';
+  $('gconfWrap').hidden = !setup;
+  $('gtokWrap').hidden = !setup;
+  $('gpass').autocomplete = setup ? 'new-password' : 'current-password';
+  $('gbtn').textContent = mode==='login' ? 'Entrar' : 'Salvar acesso';
+  $('gnote').textContent = setup ? 'Guarde bem a senha: os dados ficam criptografados com ela e não há como recuperá-los sem ela. Use pelo menos 8 caracteres, misturando letras e números.'
+    : mode==='login' ? 'Seus dados ficam criptografados com sua senha.' : '';
+  $('gcancel').hidden = mode!=='change';
+  $('gerr').textContent = msg || '';
+  $('gpass').value = ''; $('gconf').value = ''; $('gtok').value = '';
+  $('main').hidden = true; $('gate').hidden = false;
+  if(mode!=='error') setTimeout(()=>($('guser').value ? $('gpass') : $('guser')).focus(), 30);
+}
+async function openApp(data){
+  ghToken = data.token || ghToken;
+  state = {months:data.months||{}, updatedAt:data.updatedAt||0};
+  try{
+    const d = JSON.parse(localStorage.getItem(draftKey())||'null');
+    if(d && d.salt===salt && (d.updatedAt||0) > (state.updatedAt||0)){
+      const dd = await decrypt(cryptoKey, d);
+      state = {months:dd.months||{}, updatedAt:dd.updatedAt}; dirty = true;
+    }
+  }catch(e){}
+  $('gate').hidden = true; $('main').hidden = false;
+  readHash(); render();
+  if(dirty){ $('saveBtn').disabled = false; setStatus('Rascunho não salvo recuperado', true); clearTimeout(autoTimer); autoTimer = setTimeout(()=>save(), AUTOSAVE_MS); }
+  else setStatus('Tudo salvo', false);
+  resetIdle();
+}
+async function lock(){
+  if(dirty) await writeDraft();
+  try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){}
+  clearTimeout(draftTimer); clearTimeout(autoTimer);
+  state = null; cryptoKey = null; ghToken = null; dirty = false;
+  $('view').innerHTML = ''; $('tabs').innerHTML = '';
+  showGate(stored ? 'login' : 'setup');
+}
+$('logoutBtn').onclick = ()=>lock();
+$('gcancel').onclick = ()=>{ $('gate').hidden = true; $('main').hidden = false; };
+
+$('gform').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const user = $('guser').value.trim(), pass = $('gpass').value, err = $('gerr');
+  if(!window.crypto || !crypto.subtle){ err.textContent = 'Este navegador não suporta criptografia. Abra o site por https.'; return; }
+  if(!user || !pass){ err.textContent = 'Preencha usuário e senha.'; return; }
+  $('gbtn').disabled = true; err.textContent = '';
+  try{
+    if(gateMode==='login'){
+      $('gbtn').textContent = 'Verificando…';
+      const key = await deriveKey(user, pass, stored.enc.salt, stored.enc.iter||ITER);
+      let data;
+      try{ data = await decrypt(key, stored.enc); }
+      catch(_){ err.textContent = 'Usuário ou senha incorretos.'; $('gpass').value=''; $('gpass').focus(); return; }
+      cryptoKey = key; salt = stored.enc.salt;
+      await rememberSession();
+      await openApp(data);
+    } else {
+      if(pass.length < 8){ err.textContent = 'Use uma senha com pelo menos 8 caracteres.'; return; }
+      if(pass !== $('gconf').value){ err.textContent = 'As senhas não conferem.'; return; }
+      const tok = $('gtok').value.trim();
+      if(gateMode==='setup' && !tok){ err.textContent = 'Informe o token do GitHub.'; return; }
+      $('gbtn').textContent = 'Conectando ao GitHub…';
+      const useTok = tok || ghToken;
+      try{ await checkToken(useTok); }catch(x){ err.textContent = x.message; return; }
+      if(gateMode==='setup'){
+        // confere se outro aparelho já criou o acesso
+        const rem = await loadRemote(useTok);
+        if(rem.data){ stored = rem.data; remoteSha = rem.sha; showGate('login', 'Já existe um acesso criado. Entre com seu usuário e senha.'); return; }
+        state = {months:{}, updatedAt:Date.now()};
+      }
+      $('gbtn').textContent = 'Protegendo…';
+      ghToken = useTok;
+      const newSalt = b64(crypto.getRandomValues(new Uint8Array(16)));
+      cryptoKey = await deriveKey(user, pass, newSalt, ITER); salt = newSalt;
+      dirty = true; editSeq++;
+      const ok = await save(true);
+      if(!ok){ err.textContent = 'Não foi possível salvar no GitHub. ' + (lastError && lastError.status ? '(erro '+lastError.status+')' : 'Verifique a conexão.'); return; }
+      await rememberSession();
+      const wasSetup = gateMode==='setup';
+      await openApp(payload());
+      toast(wasSetup ? 'Acesso criado — seus dados estão protegidos' : 'Senha atualizada');
+    }
+  } finally {
+    $('gbtn').disabled = false;
+    $('gbtn').textContent = gateMode==='login' ? 'Entrar' : 'Salvar acesso';
+  }
+});
+
+// bloqueio automático por inatividade
+let idleTimer;
+function resetIdle(){ clearTimeout(idleTimer); if(state) idleTimer = setTimeout(async ()=>{ if(state){ await lock(); $('gerr').textContent = 'Sessão encerrada por inatividade.'; } }, IDLE_MIN*60000); }
+['keydown','pointerdown','wheel'].forEach(ev=>document.addEventListener(ev, resetIdle, {passive:true}));
+
+// ---------- início ----------
+(async ()=>{
+  if(!CFG.owner || !CFG.repo){ showGate('error', 'Repositório não configurado. Defina owner e repo no início do script.'); return; }
+  let rem;
+  try{ rem = await loadRemote(); }
+  catch(e){ showGate('error', 'Verifique sua conexão e recarregue a página. (' + (e.status ? 'erro '+e.status : 'sem conexão') + ')'); return; }
+  stored = rem.data; remoteSha = rem.sha;
+  if(!stored || !stored.enc){ showGate('setup'); return; }
+  salt = stored.enc.salt;
+  const k = await sessionKey();
+  if(k){
+    try{ const data = await decrypt(k, stored.enc); cryptoKey = k; await openApp(data); return; }catch(e){}
+  }
+  showGate('login');
+})();
+})();
+</script>
+</body>
+</html>
