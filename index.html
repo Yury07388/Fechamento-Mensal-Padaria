@@ -114,7 +114,13 @@ tfoot td.l{text-align:left}
 .menu-pop hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
 .fhelp{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5}
 .fhelp a{color:var(--accent)}
-#gfields[hidden],#gconfWrap[hidden],#gtokWrap[hidden],.gcancel[hidden]{display:none}
+#gfields[hidden],#gconfWrap[hidden],#gtokWrap[hidden],#guserWrap[hidden],#gpassWrap[hidden],.gcancel[hidden]{display:none}
+
+.datejump{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 6px 0 12px;height:36px;color:var(--muted);font-size:12px;font-weight:500}
+.datejump input{background:transparent;border:0;color:var(--text);font:inherit;font-size:13px;outline:none;color-scheme:dark;height:34px}
+.datejump:focus-within{border-color:var(--accent)}
+tbody tr.flash td{animation:flash 1.6s ease-out}
+@keyframes flash{0%{background:var(--accent-soft)}100%{background:transparent}}
 </style>
 </head>
 <body>
@@ -125,8 +131,8 @@ tfoot td.l{text-align:left}
       <h2 id="gtitle">Fechamento de Caixa</h2>
       <p class="lead" id="glead">Carregando…</p>
       <div id="gfields" hidden>
-        <div class="field"><label for="guser">Usuário</label><input id="guser" name="username" autocomplete="username"></div>
-        <div class="field"><label for="gpass">Senha</label><input id="gpass" name="password" type="password" autocomplete="current-password"></div>
+        <div class="field" id="guserWrap"><label for="guser">Usuário</label><input id="guser" name="username" autocomplete="username"></div>
+        <div class="field" id="gpassWrap"><label for="gpass">Senha</label><input id="gpass" name="password" type="password" autocomplete="current-password"></div>
         <div class="field" id="gconfWrap" hidden><label for="gconf">Confirmar senha</label><input id="gconf" type="password" autocomplete="new-password"></div>
         <div class="field" id="gtokWrap" hidden>
           <label for="gtok">Token do GitHub</label>
@@ -149,7 +155,7 @@ tfoot td.l{text-align:left}
       </div>
       <div class="status" id="status"><i></i><span>Tudo salvo</span></div>
       <div class="yearsel"><button id="yprev" aria-label="Ano anterior">‹</button><span id="ylabel" class="num"></span><button id="ynext" aria-label="Próximo ano">›</button></div>
-      <button class="btn primary" id="saveBtn" disabled>Salvar</button>
+      <label class="datejump" title="Ir para uma data"><span>Ir para</span><input type="date" id="goDate"></label>
       <div class="menu">
         <button class="btn" id="menuBtn" aria-haspopup="true">Opções ▾</button>
         <div class="menu-pop" id="menuPop" hidden>
@@ -157,7 +163,7 @@ tfoot td.l{text-align:left}
           <button data-act="backup">Baixar backup (.json)</button>
           <button data-act="import">Importar backup…</button>
           <hr>
-          <button data-act="pw">Trocar senha / token</button>
+          <button data-act="pw">Trocar token do GitHub</button>
         </div>
       </div>
       <button class="btn ghost" id="logoutBtn">Sair</button>
@@ -193,9 +199,11 @@ const CFG = {
 const API = 'https://api.github.com';
 const SESSION_KEY = 'fechamento-caixa-sessao';
 const draftKey = ()=>'fechamento-caixa-draft:' + CFG.owner + '/' + CFG.repo;
-const ITER = 310000;
+// Acesso fixo: só a verificação criptografada fica aqui, nunca a senha.
+const FIXED = {"salt":"QJPvTvGGQa1awI8J6NhRVg==","iter":600000,"check":{"iv":"QfW8z5vUgJwJEIkA","ct":"CiqZJ/T5AHIsnQOht1Ha1fAg7dw6orwl/fE7"}};
+const ITER = FIXED.iter;
 const IDLE_MIN = 20;
-const AUTOSAVE_MS = 4000;
+const AUTOSAVE_MS = 1500;
 
 let stored = null, remoteSha = null;   // conteúdo criptografado do repositório
 let state = null;                      // dados abertos (só na memória após login)
@@ -395,12 +403,15 @@ document.addEventListener('input',e=>{
     if(v==null || v===0) delete r[k]; else r[k] = v;
     inp.classList.toggle('negv', k!=='sai' && v<0);
   }
+  const newVal = r[k]!==undefined ? r[k] : null;
   if(!Object.keys(r).length) delete m[d];
   if(!Object.keys(m).length) delete state.months[K];
-  markDirty(); refreshComputed();
+  markDirty({t:'cell', K, d, k, v:newVal}); refreshComputed();
 });
 document.addEventListener('focusout',e=>{
-  const inp = e.target; if(!inp.matches('#tbody input') || inp.dataset.k==='obs') return;
+  const inp = e.target; if(!inp.matches('#tbody input')) return;
+  saveSoon(300);
+  if(inp.dataset.k==='obs') return;
   const v = parseNum(inp.value);
   if(!Number.isNaN(v)){ inp.value = plain(v==null||v===0?null:(inp.dataset.k==='sai'?Math.abs(v):v)); inp.classList.remove('err'); }
 });
@@ -466,31 +477,74 @@ function csv(){
   }
   return '﻿'+lines.join('\r\n');
 }
-// ---------- salvar (GitHub) ----------
+// ---------- salvar (GitHub, automático) ----------
 function setStatus(text, isDirty){
   const s = $('status'); s.classList.toggle('dirty', !!isDirty);
   s.querySelector('span').textContent = text;
 }
-let draftTimer, autoTimer, saving = false, editSeq = 0, lastError = null;
-function markDirty(){
-  dirty = true; editSeq++; state.updatedAt = Date.now();
+let draftTimer, autoTimer, saving = false, lastError = null;
+let pending = [];   // alterações ainda não confirmadas no GitHub (usadas para mesclar com outro aparelho)
+
+function markDirty(op){
+  dirty = true; state.updatedAt = Date.now();
+  if(op) pending.push(op);
   clearTimeout(draftTimer);
-  draftTimer = setTimeout(writeDraft, 400);
-  setStatus('Alterações não salvas', true); $('saveBtn').disabled = false;
+  draftTimer = setTimeout(writeDraft, 300);
+  setStatus('Salvando…', true);
+  saveSoon(AUTOSAVE_MS);
+}
+function saveSoon(ms){
+  if(!dirty) return;
   clearTimeout(autoTimer);
-  autoTimer = setTimeout(()=>save(), AUTOSAVE_MS);
+  autoTimer = setTimeout(()=>save(), ms);
 }
 async function writeDraft(){
-  try{ const e = await encrypt(payload()); localStorage.setItem(draftKey(), JSON.stringify({salt, updatedAt:state.updatedAt, ...e})); }catch(e){}
+  try{ const e = await encrypt({...payload(), pending}); localStorage.setItem(draftKey(), JSON.stringify({salt, updatedAt:state.updatedAt, ...e})); }catch(e){}
 }
 function payload(){ return {months:state.months, updatedAt:state.updatedAt||0, token:ghToken}; }
 
-async function save(force){
+function applyOp(months, op){
+  if(op.t==='month'){ months[op.K] = JSON.parse(JSON.stringify(op.data)); return; }
+  const m = months[op.K] || (months[op.K] = {});
+  const r = m[op.d] || (m[op.d] = {});
+  if(op.v==null || op.v==='') delete r[op.k]; else r[op.k] = op.v;
+  if(!Object.keys(r).length) delete m[op.d];
+  if(!Object.keys(m).length) delete months[op.K];
+}
+// outro aparelho salvou antes: baixa a versão nova, reaplica as alterações daqui e tenta de novo
+async function mergeRemote(){
+  const rem = await loadRemote(ghToken);
+  if(!rem.data || !rem.data.enc) return false;
+  if(rem.data.enc.salt !== salt){
+    await lock();
+    $('gerr').textContent = 'A senha foi alterada em outro aparelho. Entre com a nova senha (suas últimas alterações ficaram guardadas neste navegador).';
+    return false;
+  }
+  const data = await decrypt(cryptoKey, rem.data.enc);
+  const months = data.months || {};
+  pending.forEach(op=>applyOp(months, op));
+  state.months = months;
+  remoteSha = rem.sha; stored = rem.data;
+  rerenderKeepingFocus();
+  return true;
+}
+function rerenderKeepingFocus(){
+  const a = document.activeElement, tr = a && a.closest && a.closest('#tbody tr');
+  const pos = tr ? {d:tr.dataset.d, k:a.dataset.k, val:a.value, s:a.selectionStart} : null;
+  render();
+  if(pos){
+    const el = document.querySelector(`#tbody tr[data-d="${pos.d}"] input[data-k="${pos.k}"]`);
+    if(el){ el.value = pos.val; el.focus(); try{ el.setSelectionRange(pos.s,pos.s); }catch(_){} }
+  }
+}
+
+async function save(force, attempt){
+  attempt = attempt || 0;
   if(!cryptoKey || !state || (!dirty && !force)) return false;
-  if(saving){ clearTimeout(autoTimer); autoTimer = setTimeout(()=>save(force), 1500); return false; }
+  if(saving){ saveSoon(800); return false; }
   saving = true; clearTimeout(autoTimer);
-  const seq = editSeq;
-  $('saveBtn').disabled = true; setStatus('Salvando…', true);
+  const sent = pending.length, stamp = state.updatedAt;
+  setStatus('Salvando…', true);
   try{
     const e = await encrypt(payload());
     const out = {v:2, savedAt:Date.now(), enc:{salt, iter:ITER, iv:e.iv, ct:e.ct}};
@@ -503,24 +557,39 @@ async function save(force){
     if(remoteSha) body.sha = remoteSha;
     const r = await gh(`${repoPath()}/contents/${CFG.dataPath}`, {method:'PUT', body:JSON.stringify(body)}, ghToken);
     remoteSha = r.content.sha; stored = out; lastError = null;
-    if(seq === editSeq){
-      dirty = false; setStatus('Tudo salvo', false);
+    pending.splice(0, sent);
+    if(state.updatedAt === stamp){
+      dirty = false; pending = [];
+      setStatus('Salvo às ' + new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}), false);
       try{ localStorage.removeItem(draftKey()); }catch(_){}
-    } else { setStatus('Alterações não salvas', true); $('saveBtn').disabled = false; autoTimer = setTimeout(()=>save(), AUTOSAVE_MS); }
+    } else saveSoon(AUTOSAVE_MS);
     await rememberSession();
     return true;
   }catch(err){
     lastError = err;
-    $('saveBtn').disabled = false;
-    if(err.status === 401){ setStatus('Token inválido ou expirado', true); toast('Token do GitHub inválido ou expirado — atualize em Opções › Trocar senha / token'); }
-    else if(err.status === 403 || err.status === 404){ setStatus('Sem permissão no repositório', true); toast('O token não tem permissão de escrita neste repositório'); }
-    else if(err.status === 409 || err.status === 422){ setStatus('Conflito — recarregue a página', true); toast('Os dados foram alterados em outro aparelho. Recarregue a página (suas alterações daqui ficam no rascunho).'); }
-    else { setStatus('Sem conexão — tentando de novo', true); autoTimer = setTimeout(()=>save(), 15000); }
+    if((err.status === 409 || err.status === 422) && attempt < 3){
+      saving = false;
+      try{ if(await mergeRemote()) return await save(true, attempt+1); }catch(_){}
+      setStatus('Não salvo — recarregue a página', true);
+      return false;
+    }
+    if(err.status === 401){ setStatus('Token inválido ou expirado', true); toast('Token do GitHub inválido ou expirado — atualize em Opções › Trocar token do GitHub'); }
+    else if(err.status === 403 || err.status === 404){ setStatus('Sem permissão para salvar', true); toast('O token não tem permissão de escrita (Contents: Read and write)'); }
+    else { setStatus('Sem conexão — tentando de novo…', true); saveSoon(10000); }
     return false;
   }finally{ saving = false; }
 }
-$('saveBtn').onclick = ()=>save();
 window.addEventListener('beforeunload', e=>{ if(dirty){ writeDraft(); e.preventDefault(); e.returnValue=''; } });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden' && dirty){ writeDraft(); save(); } });
+
+// ---------- ir para uma data ----------
+$('goDate').addEventListener('change', e=>{
+  const v = e.target.value; if(!v || !state) return;
+  const [y,m,d] = v.split('-').map(Number);
+  year = y; month = m-1; go();
+  const tr = document.querySelector(`#tbody tr[data-d="${d}"]`);
+  if(tr){ tr.scrollIntoView && tr.scrollIntoView({block:'center'}); tr.classList.add('flash'); tr.querySelector('input[data-k="din"]').focus(); }
+});
 
 // ---------- exportar / backup ----------
 function download(name, text, type){
@@ -546,9 +615,10 @@ $('importFile').addEventListener('change', async e=>{
     const months = j.months || (j.v===1 && j.months);
     if(!months || typeof months!=='object') throw new Error('formato');
     let n = 0;
-    for(const k in months){ if(/^\d{4}-\d{2}$/.test(k)){ state.months[k] = months[k]; n++; } }
+    const ops = [];
+    for(const k in months){ if(/^\d{4}-\d{2}$/.test(k)){ state.months[k] = months[k]; ops.push({t:'month', K:k, data:months[k]}); n++; } }
     if(!n) throw new Error('vazio');
-    markDirty(); render();
+    ops.forEach(o=>pending.push(o)); markDirty(); render();
     toast(`${n} ${n===1?'mês importado':'meses importados'}`);
   }catch(err){ toast('Arquivo de backup inválido'); }
 });
@@ -611,27 +681,26 @@ async function checkToken(token){
   }
 }
 
-// ---------- login ----------
+// ---------- login (usuário e senha fixos) ----------
 let gateMode = 'loading';
 function showGate(mode, msg){
   gateMode = mode;
-  const setup = mode==='setup' || mode==='change';
-  $('gtitle').textContent = mode==='setup' ? 'Criar acesso' : mode==='change' ? 'Trocar senha / token' : 'Fechamento de Caixa';
-  $('glead').textContent = mode==='setup' ? 'Defina usuário e senha e conecte ao seu repositório do GitHub.'
-    : mode==='change' ? 'Escolha o novo usuário e senha. Deixe o token em branco para manter o atual.'
+  const tok = mode==='token' || mode==='change';
+  $('gtitle').textContent = mode==='token' ? 'Conectar ao GitHub' : mode==='change' ? 'Trocar token do GitHub' : 'Fechamento de Caixa';
+  $('glead').textContent = mode==='token' ? 'Primeiro acesso: cole o token do GitHub para o site poder salvar os dados. Isso é feito só uma vez.'
+    : mode==='change' ? 'Cole o novo token do GitHub.'
     : mode==='error' ? 'Não foi possível carregar os dados.' : 'Entre com seu usuário e senha.';
   $('gfields').hidden = mode==='error';
-  $('gconfWrap').hidden = !setup;
-  $('gtokWrap').hidden = !setup;
-  $('gpass').autocomplete = setup ? 'new-password' : 'current-password';
-  $('gbtn').textContent = mode==='login' ? 'Entrar' : 'Salvar acesso';
-  $('gnote').textContent = setup ? 'Guarde bem a senha: os dados ficam criptografados com ela e não há como recuperá-los sem ela. Use pelo menos 8 caracteres, misturando letras e números.'
-    : mode==='login' ? 'Seus dados ficam criptografados com sua senha.' : '';
+  $('guserWrap').hidden = tok; $('gpassWrap').hidden = tok;
+  $('gconfWrap').hidden = true;
+  $('gtokWrap').hidden = !tok;
+  $('gbtn').textContent = mode==='login' ? 'Entrar' : 'Salvar token';
+  $('gnote').textContent = mode==='login' ? 'Seus dados ficam criptografados.' : tok ? 'O token fica guardado criptografado junto com os dados.' : '';
   $('gcancel').hidden = mode!=='change';
   $('gerr').textContent = msg || '';
-  $('gpass').value = ''; $('gconf').value = ''; $('gtok').value = '';
+  $('gpass').value = ''; $('gtok').value = '';
   $('main').hidden = true; $('gate').hidden = false;
-  if(mode!=='error') setTimeout(()=>($('guser').value ? $('gpass') : $('guser')).focus(), 30);
+  if(mode!=='error') setTimeout(()=>(tok ? $('gtok') : $('guser').value ? $('gpass') : $('guser')).focus(), 30);
 }
 async function openApp(data){
   ghToken = data.token || ghToken;
@@ -640,61 +709,66 @@ async function openApp(data){
     const d = JSON.parse(localStorage.getItem(draftKey())||'null');
     if(d && d.salt===salt && (d.updatedAt||0) > (state.updatedAt||0)){
       const dd = await decrypt(cryptoKey, d);
-      state = {months:dd.months||{}, updatedAt:dd.updatedAt}; dirty = true;
+      state = {months:dd.months||{}, updatedAt:dd.updatedAt}; pending = dd.pending || []; dirty = true;
     }
   }catch(e){}
   $('gate').hidden = true; $('main').hidden = false;
   readHash(); render();
-  if(dirty){ $('saveBtn').disabled = false; setStatus('Rascunho não salvo recuperado', true); clearTimeout(autoTimer); autoTimer = setTimeout(()=>save(), AUTOSAVE_MS); }
+  if(dirty){ setStatus('Salvando alterações pendentes…', true); saveSoon(500); }
   else setStatus('Tudo salvo', false);
+  { const t = new Date(); $('goDate').value = t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0'); }
   resetIdle();
 }
 async function lock(){
   if(dirty) await writeDraft();
   try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){}
   clearTimeout(draftTimer); clearTimeout(autoTimer);
-  state = null; cryptoKey = null; ghToken = null; dirty = false;
+  state = null; cryptoKey = null; ghToken = null; dirty = false; pending = [];
   $('view').innerHTML = ''; $('tabs').innerHTML = '';
-  showGate(stored ? 'login' : 'setup');
+  showGate('login');
 }
 $('logoutBtn').onclick = ()=>lock();
 $('gcancel').onclick = ()=>{ $('gate').hidden = true; $('main').hidden = false; };
 
+// depois do login: abre os dados do GitHub ou pede o token no primeiro acesso
+async function afterLogin(){
+  if(stored && stored.enc){
+    if(stored.enc.salt !== salt){
+      showGate('error', 'Os dados no GitHub foram criados com outra senha. Apague o arquivo data.json da branch "dados" no repositório e entre de novo.');
+      return;
+    }
+    await openApp(await decrypt(cryptoKey, stored.enc));
+  } else showGate('token');
+}
+
 $('gform').addEventListener('submit', async e=>{
   e.preventDefault();
-  const user = $('guser').value.trim(), pass = $('gpass').value, err = $('gerr');
+  const err = $('gerr');
   if(!window.crypto || !crypto.subtle){ err.textContent = 'Este navegador não suporta criptografia. Abra o site por https.'; return; }
-  if(!user || !pass){ err.textContent = 'Preencha usuário e senha.'; return; }
   $('gbtn').disabled = true; err.textContent = '';
   try{
     if(gateMode==='login'){
+      const user = $('guser').value.trim(), pass = $('gpass').value;
+      if(!user || !pass){ err.textContent = 'Preencha usuário e senha.'; return; }
       $('gbtn').textContent = 'Verificando…';
-      const key = await deriveKey(user, pass, stored.enc.salt, stored.enc.iter||ITER);
-      let data;
-      try{ data = await decrypt(key, stored.enc); }
+      const key = await deriveKey(user, pass, FIXED.salt, FIXED.iter);
+      try{ await decrypt(key, FIXED.check); }
       catch(_){ err.textContent = 'Usuário ou senha incorretos.'; $('gpass').value=''; $('gpass').focus(); return; }
-      cryptoKey = key; salt = stored.enc.salt;
+      cryptoKey = key; salt = FIXED.salt;
       await rememberSession();
-      await openApp(data);
+      await afterLogin();
     } else {
-      if(pass.length < 8){ err.textContent = 'Use uma senha com pelo menos 8 caracteres.'; return; }
-      if(pass !== $('gconf').value){ err.textContent = 'As senhas não conferem.'; return; }
       const tok = $('gtok').value.trim();
-      if(gateMode==='setup' && !tok){ err.textContent = 'Informe o token do GitHub.'; return; }
+      if(!tok){ err.textContent = 'Cole o token do GitHub.'; return; }
       $('gbtn').textContent = 'Conectando ao GitHub…';
-      const useTok = tok || ghToken;
-      try{ await checkToken(useTok); }catch(x){ err.textContent = x.message; return; }
-      if(gateMode==='setup'){
-        // confere se outro aparelho já criou o acesso
-        const rem = await loadRemote(useTok);
-        if(rem.data){ stored = rem.data; remoteSha = rem.sha; showGate('login', 'Já existe um acesso criado. Entre com seu usuário e senha.'); return; }
+      try{ await checkToken(tok); }catch(x){ err.textContent = x.message; return; }
+      if(gateMode==='token'){
+        const rem = await loadRemote(tok);   // outro aparelho pode ter configurado antes
+        stored = rem.data; remoteSha = rem.sha;
+        if(stored && stored.enc){ await afterLogin(); return; }
         state = {months:{}, updatedAt:Date.now()};
       }
-      $('gbtn').textContent = 'Protegendo…';
-      ghToken = useTok;
-      const newSalt = b64(crypto.getRandomValues(new Uint8Array(16)));
-      cryptoKey = await deriveKey(user, pass, newSalt, ITER); salt = newSalt;
-      dirty = true; editSeq++;
+      ghToken = tok; dirty = true; state.updatedAt = Date.now();
       const ok = await save(true);
       if(!ok){
         const st = lastError && lastError.status;
@@ -703,17 +777,16 @@ $('gform').addEventListener('submit', async e=>{
           : 'Não foi possível salvar no GitHub. ' + (st ? '(erro '+st+')' : 'Verifique a conexão.');
         return;
       }
-      await rememberSession();
-      const wasSetup = gateMode==='setup';
+      const first = gateMode==='token';
       await openApp(payload());
-      toast(wasSetup ? 'Acesso criado — seus dados estão protegidos' : 'Senha atualizada');
+      toast(first ? 'Tudo pronto — os dados serão salvos automaticamente' : 'Token atualizado');
     }
   } catch(x){
     err.textContent = (x && x.status === 403) ? 'O GitHub recusou o acesso (403). Confira se o token tem Contents: "Read and write".'
       : 'Erro inesperado: ' + ((x && x.message) || x);
   } finally {
     $('gbtn').disabled = false;
-    $('gbtn').textContent = gateMode==='login' ? 'Entrar' : 'Salvar acesso';
+    $('gbtn').textContent = gateMode==='login' ? 'Entrar' : 'Salvar token';
   }
 });
 
@@ -729,11 +802,10 @@ function resetIdle(){ clearTimeout(idleTimer); if(state) idleTimer = setTimeout(
   try{ rem = await loadRemote(); }
   catch(e){ showGate('error', 'Verifique sua conexão e recarregue a página. (' + (e.status ? 'erro '+e.status : 'sem conexão') + ')'); return; }
   stored = rem.data; remoteSha = rem.sha;
-  if(!stored || !stored.enc){ showGate('setup'); return; }
-  salt = stored.enc.salt;
+  salt = FIXED.salt;
   const k = await sessionKey();
   if(k){
-    try{ const data = await decrypt(k, stored.enc); cryptoKey = k; await openApp(data); return; }catch(e){}
+    try{ await decrypt(k, FIXED.check); cryptoKey = k; await afterLogin(); return; }catch(e){}
   }
   showGate('login');
 })();
