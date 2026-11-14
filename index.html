@@ -114,7 +114,7 @@ tfoot td.l{text-align:left}
 .menu-pop hr{border:0;border-top:1px solid var(--line);margin:6px 4px}
 .fhelp{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.5}
 .fhelp a{color:var(--accent)}
-#gfields[hidden],#gconfWrap[hidden],#gtokWrap[hidden]{display:none}
+#gfields[hidden],#gconfWrap[hidden],#gtokWrap[hidden],.gcancel[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -596,13 +596,18 @@ async function checkToken(token){
   let repo;
   try{ repo = await gh(repoPath(), {}, token); }
   catch(e){ throw new Error(e.status===401 ? 'Token inválido.' : 'O token não tem acesso ao repositório '+CFG.owner+'/'+CFG.repo+'.'); }
-  if(!repo.permissions || !repo.permissions.push) throw new Error('O token precisa da permissão Contents: Read and write.');
+  const NO_WRITE = 'O token não tem permissão de escrita. No GitHub, edite o token e em Permissions › Contents escolha "Read and write" (não "Read-only").';
+  if(!repo.permissions || !repo.permissions.push) throw new Error(NO_WRITE);
   // garante a branch de dados (separada, para não republicar o site a cada salvamento)
-  try{ await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(CFG.dataBranch)}`, {}, token); }
-  catch(e){
-    if(e.status !== 404) throw new Error('Não foi possível verificar a branch de dados.');
+  try{ await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(CFG.dataBranch)}`, {}, token); return; }
+  catch(e){ if(e.status !== 404) throw new Error('Não foi possível verificar a branch de dados (erro ' + e.status + ').'); }
+  try{
     const base = await gh(`${repoPath()}/git/ref/heads/${encodeURIComponent(repo.default_branch)}`, {}, token);
     await gh(`${repoPath()}/git/refs`, {method:'POST', body:JSON.stringify({ref:'refs/heads/'+CFG.dataBranch, sha:base.object.sha})}, token);
+  }catch(e){
+    if(e.status === 403 || e.status === 404) throw new Error(NO_WRITE);
+    if(e.status === 409) throw new Error('O repositório está vazio. Suba o index.html antes de criar o acesso.');
+    throw new Error('Não foi possível criar a branch de dados (erro ' + e.status + ').');
   }
 }
 
@@ -691,12 +696,21 @@ $('gform').addEventListener('submit', async e=>{
       cryptoKey = await deriveKey(user, pass, newSalt, ITER); salt = newSalt;
       dirty = true; editSeq++;
       const ok = await save(true);
-      if(!ok){ err.textContent = 'Não foi possível salvar no GitHub. ' + (lastError && lastError.status ? '(erro '+lastError.status+')' : 'Verifique a conexão.'); return; }
+      if(!ok){
+        const st = lastError && lastError.status;
+        err.textContent = st === 403 ? 'O token não tem permissão de escrita. Edite o token e em Contents escolha "Read and write".'
+          : st === 401 ? 'Token inválido ou expirado.'
+          : 'Não foi possível salvar no GitHub. ' + (st ? '(erro '+st+')' : 'Verifique a conexão.');
+        return;
+      }
       await rememberSession();
       const wasSetup = gateMode==='setup';
       await openApp(payload());
       toast(wasSetup ? 'Acesso criado — seus dados estão protegidos' : 'Senha atualizada');
     }
+  } catch(x){
+    err.textContent = (x && x.status === 403) ? 'O GitHub recusou o acesso (403). Confira se o token tem Contents: "Read and write".'
+      : 'Erro inesperado: ' + ((x && x.message) || x);
   } finally {
     $('gbtn').disabled = false;
     $('gbtn').textContent = gateMode==='login' ? 'Entrar' : 'Salvar acesso';
